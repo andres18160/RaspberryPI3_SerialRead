@@ -133,6 +133,7 @@ namespace EnrutadorDeSensor
 
             try
             {
+                
                 serialPort = await SerialDevice.FromIdAsync(entry.Id);
                 if (serialPort == null) return;
 

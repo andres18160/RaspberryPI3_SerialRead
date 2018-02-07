@@ -47,9 +47,9 @@
             </ListBox>
         </StackPanel>
 
-        <StackPanel Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Vertical" Margin="30,0,0,0" Height="84" Width="94">
-            <Button Name="comPortInput" Content="Connect" Click="comPortInput_Click"/>
+        <StackPanel Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Vertical" Margin="172,0.5,-142,25.5" Height="84" Width="94" Grid.RowSpan="2">
             <Button Name="closeDevice" Margin="0,20,0,0" Content="Disconnect" Click="closeDevice_Click"/>
+            <Button x:Name="comPortInput" Content="Connect" Click="comPortInput_Click"/>
         </StackPanel>
 
         <StackPanel Grid.Row="3" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Margin="70,10,0,0">
