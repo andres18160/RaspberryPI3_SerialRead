@@ -20,7 +20,7 @@ using Windows.UI.Xaml.Data;
 using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
-
+using Windows.Devices.Gpio;
 // La plantilla de elemento Página en blanco está documentada en https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0xc0a
 
 namespace EnrutadorDeSensor
@@ -47,6 +47,7 @@ namespace EnrutadorDeSensor
             ListAvailablePorts();
 
             AlmacenarRegistro();
+            serial2();
         }
 
         private async void ListAvailablePorts()
@@ -109,7 +110,85 @@ namespace EnrutadorDeSensor
             }
         }
 
+        private async void serial2()
+        {
+            try
+            {
 
+                string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
+                var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
+                serialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
+
+
+                if (serialPort == null) return;
+
+                // Disable the 'Connect' button 
+                comPortInput.IsEnabled = false;
+
+                // Configure serial settings
+                serialPort.WriteTimeout = TimeSpan.FromMilliseconds(1000);
+                serialPort.ReadTimeout = TimeSpan.FromMilliseconds(1000);
+                serialPort.BaudRate = 9600;
+                serialPort.Parity = SerialParity.None;
+                serialPort.StopBits = SerialStopBitCount.One;
+                serialPort.DataBits = 8;
+                serialPort.Handshake = SerialHandshake.None;
+
+                // Display configured settings
+                status.Text = "Serial port configured successfully: ";
+                status.Text += serialPort.BaudRate + "-";
+                status.Text += serialPort.DataBits + "-";
+                status.Text += serialPort.Parity.ToString() + "-";
+                status.Text += serialPort.StopBits;
+
+                // Set the RcvdText field to invoke the TextChanged callback
+                // The callback launches an async Read task to wait for data
+                rcvdText.Text = "Waiting for data...";
+
+                // Create cancellation token object to close I/O operations when closing the device
+                ReadCancellationTokenSource = new CancellationTokenSource();
+
+                // Enable 'WRITE' button to allow sending data
+                sendTextButton.IsEnabled = true;
+
+                Listen();
+            }
+            catch (Exception ex)
+            {
+                status.Text = ex.Message;
+                comPortInput.IsEnabled = true;
+                sendTextButton.IsEnabled = false;
+            }
+        }
+
+        public async void Serial()
+        {
+            string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
+            var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
+            SerialDevice SerialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
+
+            /* Configure serial settings */
+            SerialPort.WriteTimeout = TimeSpan.FromMilliseconds(1000);
+            SerialPort.ReadTimeout = TimeSpan.FromMilliseconds(1000);
+            SerialPort.BaudRate = 9600;                                             /* mini UART: only standard baudrates */
+            SerialPort.Parity = SerialParity.None;                                  /* mini UART: no parities */
+            SerialPort.StopBits = SerialStopBitCount.One;                           /* mini UART: 1 stop bit */
+            SerialPort.DataBits = 8;
+
+            /* Write a string out over serial */
+            string txBuffer = "Hello Serial";
+            DataWriter dataWriter = new DataWriter();
+            dataWriter.WriteString(txBuffer);
+            uint bytesWritten = await SerialPort.OutputStream.WriteAsync(dataWriter.DetachBuffer());
+
+            /* Read data in from the serial port */
+            const uint maxReadLength = 1024;
+            DataReader dataReader = new DataReader(SerialPort.InputStream);
+            uint bytesToRead = await dataReader.LoadAsync(maxReadLength);
+            string rxBuffer = dataReader.ReadString(bytesToRead);
+            rcvdText.Text = rxBuffer;
+
+        }
         /// <summary>
         /// comPortInput_Click: Action to take when 'Connect' button is clicked
         /// - Get the selected device index and use Id to create the SerialDevice object
@@ -133,8 +212,12 @@ namespace EnrutadorDeSensor
 
             try
             {
-                
-                serialPort = await SerialDevice.FromIdAsync(entry.Id);
+
+                string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
+                var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
+                serialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
+
+
                 if (serialPort == null) return;
 
                 // Disable the 'Connect' button 
@@ -253,6 +336,7 @@ namespace EnrutadorDeSensor
         /// <param name="e"></param>
         private async void Listen()
         {
+
             try
             {
                 if (serialPort != null)
@@ -293,6 +377,9 @@ namespace EnrutadorDeSensor
         /// <returns></returns>
         private async Task ReadAsync(CancellationToken cancellationToken)
         {
+
+
+
             Task<UInt32> loadAsyncTask;
 
             uint ReadBufferLength = 1024;
@@ -308,13 +395,15 @@ namespace EnrutadorDeSensor
                 // Create a task object to wait for data on the serialPort.InputStream
                 loadAsyncTask = dataReaderObject.LoadAsync(ReadBufferLength).AsTask(childCancellationTokenSource.Token);
 
+    
                 // Launch the task and wait
-                UInt32 bytesRead = await loadAsyncTask;
-                if (bytesRead > 0)
-                {
-                    rcvdText.Text = dataReaderObject.ReadString(bytesRead);
-                    status.Text = "bytes read successfully!";
-                }
+                   UInt32 bytesRead = await loadAsyncTask;
+                   if (bytesRead > 0)
+                   {
+                       string mensaje= dataReaderObject.ReadString(bytesRead);
+                       rcvdText.Text = mensaje;
+                       status.Text = "bytes read successfully!";
+                   }
             }
         }
 
