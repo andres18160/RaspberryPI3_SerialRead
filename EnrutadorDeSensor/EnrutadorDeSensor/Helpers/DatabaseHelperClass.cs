@@ -46,8 +46,8 @@ namespace EnrutadorDeSensor.Helpers
                 });
             }
         }
-        // Retrieve the specific contact from the database.     
-        public Lectura ReadContact(int id)
+ 
+        public Lectura ReadLectura(int id)
         {
             using (SQLiteConnection conn = new SQLiteConnection(new SQLitePlatformWinRT(), App.DB_PATH))
             {

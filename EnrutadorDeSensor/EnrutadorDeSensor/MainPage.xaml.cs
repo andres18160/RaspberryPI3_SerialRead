@@ -21,6 +21,13 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Navigation;
 using Windows.Devices.Gpio;
+using System.Net;
+using Newtonsoft.Json;
+using EnrutadorDeSensor.Entidades;
+using System.Text;
+using System.Net.Http;
+using System.Dynamic;
+using System.Diagnostics;
 // La plantilla de elemento Página en blanco está documentada en https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0xc0a
 
 namespace EnrutadorDeSensor
@@ -35,20 +42,26 @@ namespace EnrutadorDeSensor
         DataReader dataReaderObject = null;
         private ObservableCollection<DeviceInformation> listOfDevices;
         private CancellationTokenSource ReadCancellationTokenSource;
-
+        string sUrlRequest = "https://metrocontrol.000webhostapp.com/registros"; 
         string path;
+        ObservableCollection<Lectura> listaLecturas;
+        ObservableCollection<LecturaJson> listaLecturasJson;
         SQLite.Net.SQLiteConnection conn;
         DatabaseHelperClass Db_Helper = new DatabaseHelperClass();//Creating object for DatabaseHelperClass.cs from ViewModel/DatabaseHelp
 
-        public MainPage()
+        public  MainPage()
         {
             this.InitializeComponent();
             listOfDevices = new ObservableCollection<DeviceInformation>();
             ListAvailablePorts();
 
-            AlmacenarRegistro();
-            serial2();
+            //InitialiseGpio();
+
+
+            serial();
         }
+
+
 
         private async void ListAvailablePorts()
         {
@@ -74,28 +87,7 @@ namespace EnrutadorDeSensor
             }
         }
 
-        private bool AlmacenarRegistro()
-        {
-            try
-            {
 
-                Db_Helper.Insert(new Lectura()
-                {
-                    Presion="500",
-                    Humedad="36",
-                    Temperatura="25",
-                    Fecha=DateTime.Now.ToString(),
-                    Estado=true
-                    
-                });
-                return true;
-            }
-            catch (Exception ex)
-            {
-                return false;
-
-            }
-        }
         private bool ConsultarRegistro()
         {
             try
@@ -110,7 +102,7 @@ namespace EnrutadorDeSensor
             }
         }
 
-        private async void serial2()
+        private async void serial()
         {
             try
             {
@@ -161,34 +153,7 @@ namespace EnrutadorDeSensor
             }
         }
 
-        public async void Serial()
-        {
-            string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
-            var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
-            SerialDevice SerialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
-
-            /* Configure serial settings */
-            SerialPort.WriteTimeout = TimeSpan.FromMilliseconds(1000);
-            SerialPort.ReadTimeout = TimeSpan.FromMilliseconds(1000);
-            SerialPort.BaudRate = 9600;                                             /* mini UART: only standard baudrates */
-            SerialPort.Parity = SerialParity.None;                                  /* mini UART: no parities */
-            SerialPort.StopBits = SerialStopBitCount.One;                           /* mini UART: 1 stop bit */
-            SerialPort.DataBits = 8;
-
-            /* Write a string out over serial */
-            string txBuffer = "Hello Serial";
-            DataWriter dataWriter = new DataWriter();
-            dataWriter.WriteString(txBuffer);
-            uint bytesWritten = await SerialPort.OutputStream.WriteAsync(dataWriter.DetachBuffer());
-
-            /* Read data in from the serial port */
-            const uint maxReadLength = 1024;
-            DataReader dataReader = new DataReader(SerialPort.InputStream);
-            uint bytesToRead = await dataReader.LoadAsync(maxReadLength);
-            string rxBuffer = dataReader.ReadString(bytesToRead);
-            rcvdText.Text = rxBuffer;
-
-        }
+      
         /// <summary>
         /// comPortInput_Click: Action to take when 'Connect' button is clicked
         /// - Get the selected device index and use Id to create the SerialDevice object
@@ -401,10 +366,94 @@ namespace EnrutadorDeSensor
                    if (bytesRead > 0)
                    {
                        string mensaje= dataReaderObject.ReadString(bytesRead);
-                       rcvdText.Text = mensaje;
+                    mensaje = mensaje.Replace("\r", ";");
+                    mensaje = mensaje.Replace("\u0002", "");
+                    String[] substrings = mensaje.Split(';');
+                    substrings[0].Replace("41040100000", "");
+                    substrings[1].Replace("42010100000", "");
+                    substrings[2].Replace("4391010000", "");
+                    try
+                    {
+                        LecturaJson _lectura = new LecturaJson();
+                        _lectura.Id = 10;
+                        _lectura.Humedad = substrings[0];
+                        _lectura.Temperatura = substrings[1];
+                        _lectura.Presion = substrings[2];
+                        _lectura.Fecha = DateTime.Now.ToString();
+
+
+
+                        Db_Helper.Insert(new Lectura()
+                        {
+                            Humedad = substrings[0],
+                            Temperatura = substrings[1],
+                            Presion = substrings[2],                          
+                            Fecha = DateTime.Now,
+                            Estado = false
+
+                        });
+
+                        listaLecturas = Db_Helper.ReadAllLecturas();
+                        if (listaLecturas != null)
+                        {
+                            try
+                            {
+                                foreach (Lectura item in listaLecturas)
+                                {
+                                    DateTime date;
+                                    LecturaJson _lecturajson = new LecturaJson();
+                                    if (!item.Estado)
+                                    {
+                                        DateTime myDate = new DateTime();
+                                        _lecturajson.Id = item.Id;
+                                        _lecturajson.Humedad = item.Humedad;
+                                        _lecturajson.Presion = item.Presion;
+                                        _lecturajson.Temperatura = item.Temperatura;
+                                        myDate = item.Fecha;
+                                        _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
+                                        _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
+                                        listaLecturasJson.Add(_lecturajson);
+                                    }
+
+                                }
+                                enviowebAsync(listaLecturasJson);
+                            }
+                            catch (Exception ex)
+                            {
+
+                            }
+                           
+                        }
+
+
+
+                    }
+                    catch (Exception ex)
+                    {
+
+                    }
+                    rcvdText.Text = mensaje;
                        status.Text = "bytes read successfully!";
                    }
             }
+        }
+
+        private async void enviowebAsync(ObservableCollection<LecturaJson> lista)
+        {
+
+            try
+            {
+                string json = JsonConvert.SerializeObject(lista);
+                WebRequest request = WebRequest.Create(sUrlRequest);
+                Uri requestUri = new Uri(sUrlRequest); //replace your Url   
+                var objClint = new HttpClient();
+                HttpResponseMessage respon = await objClint.PostAsync(requestUri, new StringContent(json, Encoding.UTF8, "application/json"));
+                string responJsonText = await respon.Content.ReadAsStringAsync();
+            }
+            catch (Exception)
+            {
+            }
+           
         }
 
         /// <summary>
@@ -461,6 +510,22 @@ namespace EnrutadorDeSensor
             catch (Exception ex)
             {
                 status.Text = ex.Message;
+            }
+        }
+
+        private void InitialiseGpio()
+        {
+            GpioController controller = GpioController.GetDefault();
+
+            //Muestra un error si no hay un controlador GPIO
+            if (controller != null)
+            {
+
+            }
+            else
+            {
+
+                Debug.WriteLine("No hay controlador GPIO en este dispositivo");
             }
         }
 
