@@ -360,78 +360,92 @@ namespace EnrutadorDeSensor
                 // Create a task object to wait for data on the serialPort.InputStream
                 loadAsyncTask = dataReaderObject.LoadAsync(ReadBufferLength).AsTask(childCancellationTokenSource.Token);
 
-    
+                string mensaje="";
                 // Launch the task and wait
                    UInt32 bytesRead = await loadAsyncTask;
                    if (bytesRead > 0)
                    {
-                       string mensaje= dataReaderObject.ReadString(bytesRead);
-                    mensaje = mensaje.Replace("\r", ";");
-                    mensaje = mensaje.Replace("\u0002", "");
-                    String[] substrings = mensaje.Split(';');
-                    substrings[0].Replace("41040100000", "");
-                    substrings[1].Replace("42010100000", "");
-                    substrings[2].Replace("4391010000", "");
+
                     try
                     {
-                        LecturaJson _lectura = new LecturaJson();
-                        _lectura.Id = 10;
-                        _lectura.Humedad = substrings[0];
-                        _lectura.Temperatura = substrings[1];
-                        _lectura.Presion = substrings[2];
-                        _lectura.Fecha = DateTime.Now.ToString();
-
-
-
-                        Db_Helper.Insert(new Lectura()
-                        {
-                            Humedad = substrings[0],
-                            Temperatura = substrings[1],
-                            Presion = substrings[2],                          
-                            Fecha = DateTime.Now,
-                            Estado = false
-
-                        });
-
-                        listaLecturas = Db_Helper.ReadAllLecturas();
-                        if (listaLecturas != null)
-                        {
-                            try
-                            {
-                                foreach (Lectura item in listaLecturas)
-                                {
-                                    DateTime date;
-                                    LecturaJson _lecturajson = new LecturaJson();
-                                    if (!item.Estado)
-                                    {
-                                        DateTime myDate = new DateTime();
-                                        _lecturajson.Id = item.Id;
-                                        _lecturajson.Humedad = item.Humedad;
-                                        _lecturajson.Presion = item.Presion;
-                                        _lecturajson.Temperatura = item.Temperatura;
-                                        myDate = item.Fecha;
-                                        _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
-                                        _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
-                                        listaLecturasJson.Add(_lecturajson);
-                                    }
-
-                                }
-                                enviowebAsync(listaLecturasJson);
-                            }
-                            catch (Exception ex)
-                            {
-
-                            }
-                           
-                        }
-
-
+                         mensaje= dataReaderObject.ReadString(bytesRead);
+                            Debug.WriteLine("LECTURA="+ mensaje);
+                            mensaje = mensaje.Replace("\r", ";");
+                            mensaje = mensaje.Replace("\u0002", "");
 
                     }
-                    catch (Exception ex)
+                    catch (ArgumentOutOfRangeException e)
                     {
-
+                        byte[] rawdata = new byte[bytesRead];
+                        dataReaderObject.ReadBytes(rawdata);
+                        Debug.WriteLine("Lectura ex=="+Encoding.Unicode.GetString(rawdata, 0, rawdata.Length));
                     }
+                    //  String[] substrings = mensaje.Split(';');
+                    // substrings[0].Replace("41040100000", "");
+                    // substrings[1].Replace("42010100000", "");
+                    // substrings[2].Replace("4391010000", "");
+                    /*
+                                        try
+                                        {
+                                            LecturaJson _lectura = new LecturaJson();
+                                            _lectura.Id = 10;
+                                            _lectura.Humedad = substrings[0];
+                                            _lectura.Temperatura = substrings[1];
+                                            _lectura.Presion = substrings[2];
+                                            _lectura.Fecha = DateTime.Now.ToString();
+
+
+
+                                            Db_Helper.Insert(new Lectura()
+                                            {
+                                                Humedad = substrings[0],
+                                                Temperatura = substrings[1],
+                                                Presion = substrings[2],                          
+                                                Fecha = DateTime.Now,
+                                                Estado = false
+
+                                            });
+
+                                            listaLecturas = Db_Helper.ReadAllLecturas();
+                                            if (listaLecturas != null)
+                                            {
+                                                try
+                                                {
+                                                    foreach (Lectura item in listaLecturas)
+                                                    {
+                                                        DateTime date;
+                                                        LecturaJson _lecturajson = new LecturaJson();
+                                                        if (!item.Estado)
+                                                        {
+                                                            DateTime myDate = new DateTime();
+                                                            _lecturajson.Id = item.Id;
+                                                            _lecturajson.Humedad = item.Humedad;
+                                                            _lecturajson.Presion = item.Presion;
+                                                            _lecturajson.Temperatura = item.Temperatura;
+                                                            myDate = item.Fecha;
+                                                            _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
+                                                            _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
+                                                            listaLecturasJson.Add(_lecturajson);
+                                                        }
+
+                                                    }
+                                                    enviowebAsync(listaLecturasJson);
+                                                }
+                                                catch (Exception ex)
+                                                {
+
+                                                }
+
+                                            }
+
+
+
+                                        }
+                                        catch (Exception ex)
+                                        {
+
+                                        }
+                    */
                     rcvdText.Text = mensaje;
                        status.Text = "bytes read successfully!";
                    }
