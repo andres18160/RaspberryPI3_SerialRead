@@ -107,7 +107,7 @@ namespace EnrutadorDeSensor
             try
             {
 
-                string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
+                string aqs = SerialDevice.GetDeviceSelector();                   /* Find the selector string for the serial device   */
                 var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
                 serialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
 
@@ -368,7 +368,7 @@ namespace EnrutadorDeSensor
 
                     try
                     {
-                         mensaje= dataReaderObject.ReadString(bytesRead);
+                        mensaje = dataReaderObject.ReadString(bytesRead);
                             Debug.WriteLine("LECTURA="+ mensaje);
                             mensaje = mensaje.Replace("\r", ";");
                             mensaje = mensaje.Replace("\u0002", "");
