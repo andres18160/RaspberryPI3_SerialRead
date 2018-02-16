@@ -90,6 +90,25 @@ namespace EnrutadorDeSensor.Helpers
 
             }
         }
+
+        //Update Stado Lectura  por id
+        public void UpdateLecturaEstado(Lectura _Lectura)
+        {
+            using (SQLiteConnection conn = new SQLiteConnection(new SQLitePlatformWinRT(), App.DB_PATH))
+            {
+
+                var existLectura = conn.Query<Lectura>("select * from Lectura where Id =" + _Lectura.Id).FirstOrDefault();
+                if (existLectura != null)
+                {
+
+                    conn.RunInTransaction(() =>
+                    {
+                        conn.Update(_Lectura);
+                    });
+                }
+
+            }
+        }
         //Delete all LecturaList or delete Lectura table     
         public void DeleteLectura()
         {

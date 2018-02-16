@@ -28,6 +28,8 @@ using System.Text;
 using System.Net.Http;
 using System.Dynamic;
 using System.Diagnostics;
+using Windows.System.Threading;
+using Windows.UI.Core;
 // La plantilla de elemento Página en blanco está documentada en https://go.microsoft.com/fwlink/?LinkId=402352&clcid=0xc0a
 
 namespace EnrutadorDeSensor
@@ -42,50 +44,112 @@ namespace EnrutadorDeSensor
         DataReader dataReaderObject = null;
         private ObservableCollection<DeviceInformation> listOfDevices;
         private CancellationTokenSource ReadCancellationTokenSource;
-        string sUrlRequest = "https://metrocontrol.000webhostapp.com/registros"; 
+        string sUrlRequest = "http://metrocontrol.metrolegal.com.co/registros"; 
         string path;
         ObservableCollection<Lectura> listaLecturas;
         ObservableCollection<LecturaJson> listaLecturasJson;
         SQLite.Net.SQLiteConnection conn;
+        DateTime tiempoAnterior = DateTime.Now;
         DatabaseHelperClass Db_Helper = new DatabaseHelperClass();//Creating object for DatabaseHelperClass.cs from ViewModel/DatabaseHelp
 
         public  MainPage()
         {
             this.InitializeComponent();
-            listOfDevices = new ObservableCollection<DeviceInformation>();
-            ListAvailablePorts();
+            lblFechaHora.Text = DateTime.Now.ToString();
+            TimeSpan period = TimeSpan.FromMilliseconds(10000);
+            TimeSpan PeriodoTiempo = TimeSpan.FromMilliseconds(1000);
 
-            //InitialiseGpio();
+
+            ThreadPoolTimer PeriodicTimer = ThreadPoolTimer.CreatePeriodicTimer(async (source) =>
+               {
+                   await Dispatcher.RunAsync(CoreDispatcherPriority.High,
+                       () =>
+                       {
+                           enviowebAsync();
+                       });
+
+               }, period);
+
+            ThreadPoolTimer PeriodoTiempoTimer = ThreadPoolTimer.CreatePeriodicTimer(async (source) =>
+            {
+                await Dispatcher.RunAsync(CoreDispatcherPriority.High,
+                    () =>
+                    {
+                        ActualizarHora();
+                    });
+
+            }, period);
 
 
             serial();
         }
 
-
-
-        private async void ListAvailablePorts()
+        private void ActualizarHora()
         {
+            lblFechaHora.Text = DateTime.Now.ToString();
+        }
+
+        private async void enviowebAsync()
+        {
+            listaLecturasJson = new ObservableCollection<LecturaJson>();
             try
             {
-                string aqs = SerialDevice.GetDeviceSelector();
-                var dis = await DeviceInformation.FindAllAsync(aqs);
-
-                status.Text = "Select a device and connect";
-
-                for (int i = 0; i < dis.Count; i++)
+                listaLecturas = Db_Helper.ReadAllLecturas();
+                if (listaLecturas != null)
                 {
-                    listOfDevices.Add(dis[i]);
+
+                    foreach (Lectura item in listaLecturas)
+                    {
+                        try
+                        {
+                            DateTime date;
+                            LecturaJson _lecturajson = new LecturaJson();
+                            if (!item.Estado)
+                            {
+                                DateTime myDate = new DateTime();
+                                _lecturajson.Id = item.Id;
+                                _lecturajson.Humedad = item.Humedad;
+                                _lecturajson.Presion = item.Presion;
+                                _lecturajson.Temperatura = item.Temperatura;
+                                myDate = item.Fecha;
+                                _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
+                                _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
+
+
+
+                                string json = JsonConvert.SerializeObject(_lecturajson);
+                                WebRequest request = WebRequest.Create(sUrlRequest);
+                                Uri requestUri = new Uri(sUrlRequest);
+                                var objClint = new HttpClient();
+                                HttpResponseMessage respon = await objClint.PostAsync(requestUri, new StringContent(json, Encoding.UTF8, "application/json"));
+                                string responJsonText = await respon.Content.ReadAsStringAsync();
+                                var respuestaJson = JsonConvert.DeserializeObject(responJsonText);
+                                Debug.WriteLine("RESPUESTA DE ENVIO =" + responJsonText);
+                                item.Estado = true;
+                                Db_Helper.UpdateDetails(item);
+
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine("ERROR =" + ex.Message);
+                        }
+
+                    }        
                 }
 
-                DeviceListSource.Source = listOfDevices;
-                comPortInput.IsEnabled = true;
-                ConnectDevices.SelectedIndex = -1;
             }
             catch (Exception ex)
             {
-                status.Text = ex.Message;
+                txtLog.Text = "ERROR=" + ex.Message;
+                Debug.WriteLine("ERROR=" + ex.Message);
             }
+
         }
+
+
+
+
 
 
         private bool ConsultarRegistro()
@@ -106,16 +170,22 @@ namespace EnrutadorDeSensor
         {
             try
             {
+                Denuevo:
+                string aqs = SerialDevice.GetDeviceSelector();                  
+                var dis = await DeviceInformation.FindAllAsync(aqs);
+                foreach (var item in dis)
+                {
+                    if(item.Name== "CP2102 USB to UART Bridge Controller")
+                    {
+                        serialPort = await SerialDevice.FromIdAsync(item.Id);
+                    }                   
+                }
 
-                string aqs = SerialDevice.GetDeviceSelector();                   /* Find the selector string for the serial device   */
-                var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
-                serialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
-
-
-                if (serialPort == null) return;
-
-                // Disable the 'Connect' button 
-                comPortInput.IsEnabled = false;
+                if (serialPort == null)
+                {
+                    txtLog.Text = "Conecta El dispositivo!";
+                    goto Denuevo;
+                }
 
                 // Configure serial settings
                 serialPort.WriteTimeout = TimeSpan.FromMilliseconds(1000);
@@ -127,171 +197,28 @@ namespace EnrutadorDeSensor
                 serialPort.Handshake = SerialHandshake.None;
 
                 // Display configured settings
-                status.Text = "Serial port configured successfully: ";
-                status.Text += serialPort.BaudRate + "-";
-                status.Text += serialPort.DataBits + "-";
-                status.Text += serialPort.Parity.ToString() + "-";
-                status.Text += serialPort.StopBits;
+                txtLog.Text = "Serial port configured successfully: ";
+                txtLog.Text += serialPort.BaudRate + "-";
+                txtLog.Text += serialPort.DataBits + "-";
+                txtLog.Text += serialPort.Parity.ToString() + "-";
+                txtLog.Text += serialPort.StopBits;
 
-                // Set the RcvdText field to invoke the TextChanged callback
-                // The callback launches an async Read task to wait for data
-                rcvdText.Text = "Waiting for data...";
+
 
                 // Create cancellation token object to close I/O operations when closing the device
                 ReadCancellationTokenSource = new CancellationTokenSource();
 
-                // Enable 'WRITE' button to allow sending data
-                sendTextButton.IsEnabled = true;
+
 
                 Listen();
             }
             catch (Exception ex)
             {
-                status.Text = ex.Message;
-                comPortInput.IsEnabled = true;
-                sendTextButton.IsEnabled = false;
+                txtLog.Text = ex.Message;
             }
         }
 
       
-        /// <summary>
-        /// comPortInput_Click: Action to take when 'Connect' button is clicked
-        /// - Get the selected device index and use Id to create the SerialDevice object
-        /// - Configure default settings for the serial port
-        /// - Create the ReadCancellationTokenSource token
-        /// - Start listening on the serial port input
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private async void comPortInput_Click(object sender, RoutedEventArgs e)
-        {
-            var selection = ConnectDevices.SelectedItems;
-
-            if (selection.Count <= 0)
-            {
-                status.Text = "Select a device and connect";
-                return;
-            }
-
-            DeviceInformation entry = (DeviceInformation)selection[0];
-
-            try
-            {
-
-                string aqs = SerialDevice.GetDeviceSelector("UART0");                   /* Find the selector string for the serial device   */
-                var dis = await DeviceInformation.FindAllAsync(aqs);                    /* Find the serial device with our selector string  */
-                serialPort = await SerialDevice.FromIdAsync(dis[0].Id);    /* Create an serial device with our selected device */
-
-
-                if (serialPort == null) return;
-
-                // Disable the 'Connect' button 
-                comPortInput.IsEnabled = false;
-
-                // Configure serial settings
-                serialPort.WriteTimeout = TimeSpan.FromMilliseconds(1000);
-                serialPort.ReadTimeout = TimeSpan.FromMilliseconds(1000);
-                serialPort.BaudRate = 9600;
-                serialPort.Parity = SerialParity.None;
-                serialPort.StopBits = SerialStopBitCount.One;
-                serialPort.DataBits = 8;
-                serialPort.Handshake = SerialHandshake.None;
-
-                // Display configured settings
-                status.Text = "Serial port configured successfully: ";
-                status.Text += serialPort.BaudRate + "-";
-                status.Text += serialPort.DataBits + "-";
-                status.Text += serialPort.Parity.ToString() + "-";
-                status.Text += serialPort.StopBits;
-
-                // Set the RcvdText field to invoke the TextChanged callback
-                // The callback launches an async Read task to wait for data
-                rcvdText.Text = "Waiting for data...";
-
-                // Create cancellation token object to close I/O operations when closing the device
-                ReadCancellationTokenSource = new CancellationTokenSource();
-
-                // Enable 'WRITE' button to allow sending data
-                sendTextButton.IsEnabled = true;
-
-                Listen();
-            }
-            catch (Exception ex)
-            {
-                status.Text = ex.Message;
-                comPortInput.IsEnabled = true;
-                sendTextButton.IsEnabled = false;
-            }
-        }
-
-        /// <summary>
-        /// sendTextButton_Click: Action to take when 'WRITE' button is clicked
-        /// - Create a DataWriter object with the OutputStream of the SerialDevice
-        /// - Create an async task that performs the write operation
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private async void sendTextButton_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                if (serialPort != null)
-                {
-                    // Create the DataWriter object and attach to OutputStream
-                    dataWriteObject = new DataWriter(serialPort.OutputStream);
-
-                    //Launch the WriteAsync task to perform the write
-                    await WriteAsync();
-                }
-                else
-                {
-                    status.Text = "Select a device and connect";
-                }
-            }
-            catch (Exception ex)
-            {
-                status.Text = "sendTextButton_Click: " + ex.Message;
-            }
-            finally
-            {
-                // Cleanup once complete
-                if (dataWriteObject != null)
-                {
-                    dataWriteObject.DetachStream();
-                    dataWriteObject = null;
-                }
-            }
-        }
-
-        /// <summary>
-        /// WriteAsync: Task that asynchronously writes data from the input text box 'sendText' to the OutputStream 
-        /// </summary>
-        /// <returns></returns>
-        private async Task WriteAsync()
-        {
-            Task<UInt32> storeAsyncTask;
-
-            if (sendText.Text.Length != 0)
-            {
-                // Load the text from the sendText input text box to the dataWriter object
-                dataWriteObject.WriteString(sendText.Text);
-
-                // Launch an async task to complete the write operation
-                storeAsyncTask = dataWriteObject.StoreAsync().AsTask();
-
-                UInt32 bytesWritten = await storeAsyncTask;
-                if (bytesWritten > 0)
-                {
-                    status.Text = sendText.Text + ", ";
-                    status.Text += "bytes written successfully!";
-                }
-                sendText.Text = "";
-            }
-            else
-            {
-                status.Text = "Enter the text you want to write and then click on 'WRITE'";
-            }
-        }
 
         /// <summary>
         /// - Create a DataReader object
@@ -317,12 +244,12 @@ namespace EnrutadorDeSensor
             }
             catch (TaskCanceledException tce)
             {
-                status.Text = "Reading task was cancelled, closing device and cleaning up";
+                txtLog.Text = "Reading task was cancelled, closing device and cleaning up";
                 CloseDevice();
             }
             catch (Exception ex)
             {
-                status.Text = ex.Message;
+                txtLog.Text = ex.Message;
             }
             finally
             {
@@ -369,9 +296,11 @@ namespace EnrutadorDeSensor
                     try
                     {
                         mensaje = dataReaderObject.ReadString(bytesRead);
-                            Debug.WriteLine("LECTURA="+ mensaje);
-                            mensaje = mensaje.Replace("\r", ";");
-                            mensaje = mensaje.Replace("\u0002", "");
+                        Debug.WriteLine("LECTURA="+ mensaje);
+                        txtLecturas.Text = mensaje;
+                        mensaje = mensaje.Replace("\r", ";");
+                         mensaje = mensaje.Replace("\u0002", "");
+                        
 
                     }
                     catch (ArgumentOutOfRangeException e)
@@ -380,94 +309,39 @@ namespace EnrutadorDeSensor
                         dataReaderObject.ReadBytes(rawdata);
                         Debug.WriteLine("Lectura ex=="+Encoding.Unicode.GetString(rawdata, 0, rawdata.Length));
                     }
-                    //  String[] substrings = mensaje.Split(';');
-                    // substrings[0].Replace("41040100000", "");
-                    // substrings[1].Replace("42010100000", "");
-                    // substrings[2].Replace("4391010000", "");
-                    /*
-                                        try
-                                        {
-                                            LecturaJson _lectura = new LecturaJson();
-                                            _lectura.Id = 10;
-                                            _lectura.Humedad = substrings[0];
-                                            _lectura.Temperatura = substrings[1];
-                                            _lectura.Presion = substrings[2];
-                                            _lectura.Fecha = DateTime.Now.ToString();
-
-
-
-                                            Db_Helper.Insert(new Lectura()
-                                            {
-                                                Humedad = substrings[0],
-                                                Temperatura = substrings[1],
-                                                Presion = substrings[2],                          
-                                                Fecha = DateTime.Now,
-                                                Estado = false
-
-                                            });
-
-                                            listaLecturas = Db_Helper.ReadAllLecturas();
-                                            if (listaLecturas != null)
-                                            {
-                                                try
-                                                {
-                                                    foreach (Lectura item in listaLecturas)
-                                                    {
-                                                        DateTime date;
-                                                        LecturaJson _lecturajson = new LecturaJson();
-                                                        if (!item.Estado)
-                                                        {
-                                                            DateTime myDate = new DateTime();
-                                                            _lecturajson.Id = item.Id;
-                                                            _lecturajson.Humedad = item.Humedad;
-                                                            _lecturajson.Presion = item.Presion;
-                                                            _lecturajson.Temperatura = item.Temperatura;
-                                                            myDate = item.Fecha;
-                                                            _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
-                                                            _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
-                                                            listaLecturasJson.Add(_lecturajson);
-                                                        }
-
-                                                    }
-                                                    enviowebAsync(listaLecturasJson);
-                                                }
-                                                catch (Exception ex)
-                                                {
-
-                                                }
-
-                                            }
-
-
-
-                                        }
-                                        catch (Exception ex)
-                                        {
-
-                                        }
-                    */
-                    rcvdText.Text = mensaje;
-                       status.Text = "bytes read successfully!";
+                    try
+                    {
+                            Lectura obj = new Lectura();
+                            String[] substrings = mensaje.Split(';');
+                            substrings[0]= substrings[0].Replace("41040100000", "");
+                            var chars0 = substrings[0].ToCharArray();
+                            obj.Humedad = chars0[0] + "" + chars0[1] + "." + chars0[2];
+                            substrings[1]=  substrings[1].Replace("42010100000", "");
+                            var chars1 = substrings[1].ToCharArray();
+                            obj.Temperatura = chars1[0] + "" + chars1[1] + "." + chars1[2];
+                            substrings[2]= substrings[2].Replace("4391010000", "");
+                            var chars2 = substrings[2].ToCharArray();
+                            obj.Presion = chars2[0] + "" + chars2[1] + "" + chars2[2] + "." + chars2[3];
+                            obj.Fecha = DateTime.Parse(lblFechaHora.Text.ToString());
+                            obj.Estado = false;
+                            TimeSpan tiempoTranscurrido = obj.Fecha - tiempoAnterior;
+                            TimeSpan interval = new TimeSpan(0, 1, 00);
+                            Debug.WriteLine("Tiempo Transcurrido="+ tiempoTranscurrido);
+                 
+                            if(tiempoTranscurrido >= interval)
+                            {
+                                Db_Helper.Insert(obj);
+                                Debug.WriteLine("Registro Creado");
+                                tiempoAnterior = obj.Fecha;
+                            }
+                        }                    
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine("Error almacenando la informacion en la db ="+ex.Message);
+                        }
+                    
                    }
             }
-        }
-
-        private async void enviowebAsync(ObservableCollection<LecturaJson> lista)
-        {
-
-            try
-            {
-                string json = JsonConvert.SerializeObject(lista);
-                WebRequest request = WebRequest.Create(sUrlRequest);
-                Uri requestUri = new Uri(sUrlRequest); //replace your Url   
-                var objClint = new HttpClient();
-                HttpResponseMessage respon = await objClint.PostAsync(requestUri, new StringContent(json, Encoding.UTF8, "application/json"));
-                string responJsonText = await respon.Content.ReadAsStringAsync();
-            }
-            catch (Exception)
-            {
-            }
-           
         }
 
         /// <summary>
@@ -497,11 +371,6 @@ namespace EnrutadorDeSensor
                 serialPort.Dispose();
             }
             serialPort = null;
-
-            comPortInput.IsEnabled = true;
-            sendTextButton.IsEnabled = false;
-            rcvdText.Text = "";
-            listOfDevices.Clear();
         }
 
         /// <summary>
@@ -516,32 +385,16 @@ namespace EnrutadorDeSensor
         {
             try
             {
-                status.Text = "";
+                txtLog.Text = "";
                 CancelReadTask();
                 CloseDevice();
-                ListAvailablePorts();
             }
             catch (Exception ex)
             {
-                status.Text = ex.Message;
+                txtLog.Text = ex.Message;
             }
         }
 
-        private void InitialiseGpio()
-        {
-            GpioController controller = GpioController.GetDefault();
-
-            //Muestra un error si no hay un controlador GPIO
-            if (controller != null)
-            {
-
-            }
-            else
-            {
-
-                Debug.WriteLine("No hay controlador GPIO en este dispositivo");
-            }
-        }
-
+      
     }
 }

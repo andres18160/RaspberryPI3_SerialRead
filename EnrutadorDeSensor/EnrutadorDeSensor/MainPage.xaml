@@ -9,73 +9,14 @@
 
     <Page.Resources>
         <CollectionViewSource x:Name="DeviceListSource"/>
+        
     </Page.Resources>
-
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Margin="0,0,-640,0">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" MinWidth="470"/>
-            <ColumnDefinition Width="Auto" MinWidth="124"/>
-        </Grid.ColumnDefinitions>
-
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-
-
-        <StackPanel Grid.Row="1" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Margin="225,48.667,154,41" Height="20" Width="91">
-            <TextBlock Text="Select Device:" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" Orientation="Horizontal" Margin="70,29.667,0,0" Width="400" Height="80">
-            <ListBox x:Name="ConnectDevices" ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Visible" ItemsSource="{Binding Source={StaticResource DeviceListSource}}" Width="400" Height="80" Background="Gray">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Id}" />
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </StackPanel>
-
-        <StackPanel Grid.Row="1" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Vertical" Margin="242,48.667,-212,7" Height="84" Width="94" Grid.RowSpan="3">
-            <Button Name="closeDevice" Margin="0,20,0,0" Content="Disconnect" Click="closeDevice_Click"/>
-            <Button x:Name="comPortInput" Content="Connect" Click="comPortInput_Click"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="3" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Margin="233,10,163,0" Height="20" Width="74">
-            <TextBlock Text="Write Data:" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="4" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Top" Orientation="Horizontal" Margin="120,0,50,0" Width="300" Height="80">
-            <TextBox Name="sendText" Width="300" Height="80"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Center" Orientation="Horizontal" Margin="30,24,0,24" Height="32" Width="56">
-            <Button Name="sendTextButton" Content="Write" Click="sendTextButton_Click"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="5" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Margin="235,50,164,39.833" Height="20" Width="71">
-            <TextBlock Text="Read Data:" HorizontalAlignment="Left" VerticalAlignment="Top"/>
-        </StackPanel>
-
-        <StackPanel Grid.Row="5" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Margin="120,30,50,0" Width="300" Height="80" Grid.RowSpan="2">
-            <TextBox Name="rcvdText" Width="600" Height="80" FontSize="8"/>
-        </StackPanel>
-
-
-        <TextBox
-                x:Name="status" TextWrapping="Wrap" IsReadOnly="True" Width="990" Height="119" HorizontalAlignment="Left" VerticalAlignment="Top" 
-                ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto" BorderBrush="White" Grid.ColumnSpan="2" Margin="0,0,-396,0"/>
-
-
+    <Grid HorizontalAlignment="Left" Height="240" VerticalAlignment="Top" Width="380" Background="{ThemeResource AppBarBackgroundThemeBrush}">
+        <TextBlock x:Name="lblFechaHora" HorizontalAlignment="Left" Margin="156,10,0,0" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top"/>
+        <TextBlock HorizontalAlignment="Left" Margin="10,32,0,0" TextWrapping="Wrap" Text="Lectura:" VerticalAlignment="Top" RenderTransformOrigin="0.587,2.225"/>
+        <TextBox x:Name="txtLecturas" HorizontalAlignment="Left" Margin="10,57,0,0" TextWrapping="Wrap" Text="Lecturas" VerticalAlignment="Top" Width="360" Height="59" FontSize="8"/>
+        <TextBlock HorizontalAlignment="Left" Margin="10,121,0,0" TextWrapping="Wrap" Text="Debug" VerticalAlignment="Top"/>
+        <TextBox HorizontalAlignment="Left" TextWrapping="Wrap" Text="TextBox" VerticalAlignment="Top"/>
+        <TextBox x:Name="txtLog" HorizontalAlignment="Left" Margin="10,146,0,0" TextWrapping="Wrap" Text="Debug" VerticalAlignment="Top"  Width="360" Height="84" IsReadOnly="True" FontSize="8"/>
     </Grid>
 </Page>
