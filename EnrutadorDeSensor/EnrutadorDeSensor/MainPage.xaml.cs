@@ -102,18 +102,16 @@ namespace EnrutadorDeSensor
                     {
                         try
                         {
-                            DateTime date;
+                            DateTime date = DateTime.Parse(item.Fecha);
                             LecturaJson _lecturajson = new LecturaJson();
                             if (!item.Estado)
                             {
-                                DateTime myDate = new DateTime();
                                 _lecturajson.Id = item.Id;
                                 _lecturajson.Humedad = item.Humedad;
                                 _lecturajson.Presion = item.Presion;
                                 _lecturajson.Temperatura = item.Temperatura;
-                                myDate = item.Fecha;
-                                _lecturajson.Fecha = myDate.Year.ToString() + "-" + myDate.Month.ToString() + "-" + myDate.Day.ToString();
-                                _lecturajson.Hora = myDate.Hour.ToString() + ":" + myDate.Minute.ToString() + ":" + myDate.Second.ToString();
+                                _lecturajson.Fecha = date.Year.ToString() + "-" + date.Month.ToString() + "-" + date.Day.ToString();
+                                _lecturajson.Hora = date.Hour.ToString() + ":" + date.Minute.ToString() + ":" + date.Second.ToString();
 
 
 
@@ -322,17 +320,17 @@ namespace EnrutadorDeSensor
                             substrings[2]= substrings[2].Replace("4391010000", "");
                             var chars2 = substrings[2].ToCharArray();
                             obj.Presion = chars2[0] + "" + chars2[1] + "" + chars2[2] + "." + chars2[3];
-                            obj.Fecha = DateTime.Parse(lblFechaHora.Text.ToString());
+                            obj.Fecha = lblFechaHora.Text.ToString();
                             obj.Estado = false;
-                            TimeSpan tiempoTranscurrido = obj.Fecha - tiempoAnterior;
-                            TimeSpan interval = new TimeSpan(0, 1, 00);
+                            TimeSpan tiempoTranscurrido =DateTime.Parse(obj.Fecha)- tiempoAnterior;
+                            TimeSpan interval = new TimeSpan(0, 30, 00);
                             Debug.WriteLine("Tiempo Transcurrido="+ tiempoTranscurrido);
                  
                             if(tiempoTranscurrido >= interval)
                             {
                                 Db_Helper.Insert(obj);
                                 Debug.WriteLine("Registro Creado");
-                                tiempoAnterior = obj.Fecha;
+                                tiempoAnterior = DateTime.Parse(obj.Fecha);
                             }
                         }                    
                         catch (Exception ex)

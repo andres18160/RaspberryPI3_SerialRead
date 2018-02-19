@@ -16,7 +16,7 @@ namespace EnrutadorDeSensor.Models
 
         public string Temperatura { get; set; }
         public string Humedad { get; set; }
-        public DateTime Fecha { get; set; }
+        public string Fecha { get; set; }
 
         public bool Estado { get; set; }
 
@@ -26,12 +26,12 @@ namespace EnrutadorDeSensor.Models
 
         }
 
-        public Lectura(string _Presion,string _Temperatura,string _Humedad)
+        public Lectura(string _Presion,string _Temperatura,string _Humedad,string _Fecha)
         {
             Presion = _Presion;
             Temperatura = _Temperatura;
             Humedad = _Humedad;
-            Fecha = DateTime.Now;
+            Fecha = _Fecha;
             Estado = false;
         }
 
